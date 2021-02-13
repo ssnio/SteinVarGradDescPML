@@ -27,13 +27,14 @@ end
 """
     Squared Exponential Kernel and its analytical gradient
 
+*Length scaled* Squared Exponential Kernel and its analytical gradient
 """
 function sq_exp_kernel(X)
     n_parts, n_dims = size(X)
 
     sq_pairwise_dists = pairwise(Euclidean(), X', X').^2
     #@assert size(sq_pairwise_dists) == (num_particles, num_particles)
-    # l: lengrh scale
+    # l: length scale
     l = sqrt(median(sq_pairwise_dists) / 2 / log(n_parts + 1))
     kxy = exp.(-sq_pairwise_dists / l.^2 / 2)
 
