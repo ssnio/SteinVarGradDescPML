@@ -12,27 +12,27 @@ import numpy as np
 from scipy.spatial.distance import pdist, squareform
 
 
-def sq_exp_kernel(theta, h=-1):
+def sq_exp_kernel(X, h=-1):
+    n_parts, n_dims = X.shape
     # compute the rbf (squared exponential) kernel
-    sq_dist = pdist(theta)
-    pairwise_dists = squareform(sq_dist) ** 2
+    sq_pairwise_dists = squareform(pdist(X)) ** 2
     if h < 0:  # if h < 0, using median trick
-        h = np.median(pairwise_dists)
-        h = np.sqrt(0.5 * h / np.log(theta.shape[0] + 1))
-    kxy = np.exp(-pairwise_dists / h ** 2 / 2)
+        h = np.median(sq_pairwise_dists)
+        h = np.sqrt(0.5 * h / np.log(n_parts + 1))
+    kxy = np.exp(-sq_pairwise_dists / h ** 2 / 2)
 
     # compute the gradient of rbf kernel
-    dxkxy = -np.matmul(kxy, theta)
+    dxkxy = -np.matmul(kxy, X)
     sumkxy = np.sum(kxy, axis=1)
-    for i in range(theta.shape[1]):
-        dxkxy[:, i] = dxkxy[:, i] + np.multiply(theta[:, i], sumkxy)
+    for i in range(n_dims):
+        dxkxy[:, i] = dxkxy[:, i] + np.multiply(X[:, i], sumkxy)
     dxkxy = dxkxy / (h ** 2)
     return kxy, dxkxy
 
 
 def update(theta, dlogpdf, n_iter=20000, stepsize=1e-2, alpha=0.9):
 
-    num_particles, num_dims = theta.shape
+    n_parts, _ = theta.shape
 
     # adagrad with momentum
     fudge_factor = 1e-6
@@ -46,7 +46,7 @@ def update(theta, dlogpdf, n_iter=20000, stepsize=1e-2, alpha=0.9):
         kxy, dxkxy = sq_exp_kernel(theta)
 
         # gradient (step direction)
-        grad_theta = (np.matmul(kxy, dlogpdf_val) + dxkxy) / num_particles
+        grad_theta = (np.matmul(kxy, dlogpdf_val) + dxkxy) / n_parts
 
         # adagrad
         if i == 0:
@@ -61,7 +61,7 @@ def update(theta, dlogpdf, n_iter=20000, stepsize=1e-2, alpha=0.9):
 
 def update_record(theta, dlogpdf, n_iter=20000, stepsize=1e-2, alpha=0.9):
 
-    num_particles, num_dims = theta.shape
+    n_parts, _ = theta.shape
     rec_theta = [theta]
     rec_grad = []
 
@@ -78,7 +78,7 @@ def update_record(theta, dlogpdf, n_iter=20000, stepsize=1e-2, alpha=0.9):
         kxy_dlogpdf_val = np.matmul(kxy, dlogpdf_val)
 
         # gradient (step direction)
-        grad_theta = (kxy_dlogpdf_val + dxkxy) / num_particles
+        grad_theta = (kxy_dlogpdf_val + dxkxy) / n_parts
 
         # adagrad
         if i == 0:
