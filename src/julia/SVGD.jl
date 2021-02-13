@@ -48,16 +48,18 @@ function sq_exp_kernel(X)
 end
 
 
-function update(X, dlogpdf; n_iter=20000, ϵ=0.01, α=0.9)
+"""
+    update(X, dlogpdf; n_epochs=20000, dt=0.01, α=0.9, opt="adagrad")
+"""
+function update(X, dlogpdf; n_epochs=20000, dt=0.01, α=0.9, opt="adagrad")
 
-    n_parts, _ = size(X)
+    n_parts = size(X, 1)  # number of particles
+    ϕ_t = zero(X)  # historical grad (t-1)
+    ϵ = 1e-6  # fudge factor for adagrad with momentum
 
-    # adagrad with momentum
-    fudge_factor = 1e-6
-    historical_ϕ = zero(X)
+    for i in 1:n_epochs
 
-    for i in 1:n_iter
-
+        # evaluating the derivative of log pdf on particles
         dlogpdf_val = dlogpdf(X)
 
         # calculating the kernel matrix
@@ -66,14 +68,16 @@ function update(X, dlogpdf; n_iter=20000, ϵ=0.01, α=0.9)
         # gradient (step direction)
         ϕ = ((kxy * dlogpdf_val) .+ dxkxy) ./ n_parts
 
-        # adagrad
-        if i == 0
-            historical_ϕ = ϕ .^ 2
-        else
-            historical_ϕ = (α .* historical_ϕ) .+ ((1 - α) .* (ϕ .^ 2))
+
+        if opt == "adagrad" # as implemented in SVGD original repo
+            if i == 0
+                ϕ_t = ϕ .^ 2
+            else
+                ϕ_t = (α .* ϕ_t) .+ ((1 - α) .* (ϕ .^ 2))
+            end
+            ϕ ./= ϵ .+ sqrt.(ϕ_t)
         end
-        adj_grad = ϕ ./ (fudge_factor .+ sqrt.(historical_ϕ))
-        X = X + ϵ * adj_grad
+        X = X + dt .* ϕ
     end
     return X
 end
