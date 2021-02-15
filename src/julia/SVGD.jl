@@ -17,7 +17,7 @@ end
 
 
 """
-    Analytical gradient of log of Multivariae normal distribution
+    Analytical gradient of log of Multivariate normal distribution
 """
 function ana_dlogmvn(μ, Σ, x)
     - broadcast(-, x, μ) * Σ^-1
