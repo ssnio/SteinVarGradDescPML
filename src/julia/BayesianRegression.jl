@@ -84,21 +84,26 @@ b0 = 0.01
 
 ##
 # Initialise particles, e.g. 200 two-dimensional particles.
-n_dims = 20
-n_particles = 100
+n_dims = 3
+n_particles = 20
 
 # two dimensions, convention: 1st = n_particles, 2nd = theta dimensionality
 coeffs = zeros(n_particles, n_dims-1)
-# Generates 50 alpha values from the defined Gamma
+# Generates precision params (= alpha values) based on prior
 alphas = rand(Gamma(1,0.1), n_particles)
 
-## ...
-# initialization
-M = 100  # number of particles
+##
+# Generate coeffs based on precision params
+for i in 1:n_particles
+    d = Normal(0, 1/alphas[i])
+    # Alternatively, when storing log(alpha)
+    # d = Normal(0, sqrt(1/alphas[i]))
+    coeffs[i,:] =  rand(d, n_dims-1)
+end
 
-
-theta = ran(0, 1/(alpha[i]))
-
-
-## Concat
+## Concat regression coefficients and precision params
 init_particles = hcat(coeffs,alphas)
+# Alternatively, when storing log(alpha)
+# init_particles = hcat(coeffs,broadcast(log,alphas))
+
+##
