@@ -8,13 +8,17 @@ using Distributions: Gamma, Normal
     and d covariates for each datapoint x_t.
 
     Hidden variables θ = {α, w} where w consists of w_k regression coefficients
-    and a precision parameter α in R+. We assume:
+    in R and precision parameter α in R+. Hence the model is described by:
 
+    p(y_t | x_t, w, α, a, b) = p(y_t | x_t , w) * PI[((w_k | α)] * p(α; a,b)
+
+    where:
     p(y_t | x_t , w) = y_t * 1 / (1+e^(w^T * x_t) + (1- y_t) * 1 / (1+e^(-w^T * x_t)
     p(w_k | α) ~ N(w_k; 0, α^-1)
     p(α; a,b) ~ Gamma(α; a,b)
 
-    As documented in: https://web.stanford.edu/class/archive/cs/cs109/cs109.1178/lectureHandouts/220-logistic-regression.pdf
+    Logistic regression documentation:
+    https://web.stanford.edu/class/archive/cs/cs109/cs109.1178/lectureHandouts/220-logistic-regression.pdf
 
 """
 
@@ -32,7 +36,7 @@ function ana_dlogblg(particles, X, Y, a0=1, b0=0.01)
     k = size(particles,2) - 1
     # regression weights
     W = particles[:,1:k]
-    # α stored in last dimension of theta
+    # α stored in last dimension of particles
     α = particles[:,k+1]
 
     """ Log-Likelihood:
@@ -42,9 +46,8 @@ function ana_dlogblg(particles, X, Y, a0=1, b0=0.01)
 
     sigmoids = σ(W, X) # dim: particles x samples
     println(size(sigmoids))
-    @einsum d_LL_dW[particles, params, samples] := X[samples, params] * (Y[samples]) .- sigmoids[particles, samples]
+    @einsum d_LL_dW[particles, params, samples] := (Y[samples] .- sigmoids[particles, samples]) * X[samples, params]
     d_DataLL_dW = dropdims(sum(d_LL_dW, dims = 3), dims= 3) # dim: particles x k
-
 
     """ Precision:
       ∂(Σ_{1:j:K} ln p(w_k;0,α^-1) )/∂θ | (reformulating Normal, such that α is precision)
@@ -72,7 +75,6 @@ function ana_dlogblg(particles, X, Y, a0=1, b0=0.01)
     """
 
     d_prec_prior_dα =  (a0 - 1) ./ α .-b0 # dim: particles x 1 (alpha)
-
 
     d_joint_dw = d_DataLL_dW.+ d_prec_dW # dim: particles x k
     d_joint_dα = d_prec_dα .+ d_prec_prior_dα # dim: particles x 1
