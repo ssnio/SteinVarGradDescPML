@@ -1,5 +1,8 @@
 using Einsum
 using Distributions: Gamma, Normal
+using MAT
+using MLDataUtils: shuffleobs, splitobs
+include("SVGD.jl")
 
 """
     Analytical gradient of log joint for bayesian logistic regression.
@@ -22,12 +25,12 @@ using Distributions: Gamma, Normal
 
 """
 
-σ(x:: Real) = 1.0 / 1.0 + exp(-x)
+σ(x:: Real) = 1.0 / (1.0 + exp(-x))
 
 function σ(W:: Array, X:: Array)
     @einsum coeffs[particles, samples, dim] :=  W[particles, dim] * X[samples, dim]
-    summed = dropdims(sum(coeffs, dims = 3), dims= 3) # weighted sum
-    sigmoids = σ.(summed) # dim: particles x samples
+    z = dropdims(sum(coeffs, dims = 3), dims= 3) # weighted sum
+    sigmoids = σ.(z) # dim: particles x samples
     return sigmoids
 end
 
@@ -38,6 +41,8 @@ function ana_dlogblg(particles, X, Y, a0=1, b0=0.01)
     W = particles[:,1:k]
     # α stored in last dimension of particles
     α = particles[:,k+1]
+    # Alternatively, when storing log(alpha)
+    # α = exp.(particles[:,k+1])
 
     """ Log-Likelihood:
     ∂LL / ∂W_j = ∂LL(θ) / ∂p * ∂p / ∂z * ∂z / ∂W_j
@@ -45,7 +50,6 @@ function ana_dlogblg(particles, X, Y, a0=1, b0=0.01)
     """
 
     sigmoids = σ(W, X) # dim: particles x samples
-    println(size(sigmoids))
     @einsum d_LL_dW[particles, params, samples] := (Y[samples] .- sigmoids[particles, samples]) * X[samples, params]
     d_DataLL_dW = dropdims(sum(d_LL_dW, dims = 3), dims= 3) # dim: particles x k
 
@@ -84,25 +88,46 @@ function ana_dlogblg(particles, X, Y, a0=1, b0=0.01)
 end
 
 ##
-a0 = 1
-b0 = 0.01
+data = matread("src/data/covertype.mat")["covtype"]
+n_samples = 15000
 
-# Initialise particles, e.g. 200 two-dimensional particles.
-n_dims = 5
-n_particles = 50
-n_samples = 200
+# shuffleobs and splitobs utils need X to be transposed
+X = transpose(data[:,2:end])
+# replace label 2 with label -1
+Y = data[:,1]
+Y[Y.==2] .= -1
+
+# shuffle
+Xs, Ys = shuffleobs((X,Y))
+#take first n_samples
+Xs = Xs[:, 1:n_samples]
+Ys = Ys[1:n_samples]
+# split
+(X_train, Y_train), (X_test, Y_test) = splitobs((Xs, Ys), at= 0.7)
+
+# transpose back
+X_train = Array(transpose(X_train))
+Y_train = Array(Y_train)
+X_test = Array(transpose(X_test))
+Y_test = Array(Y_test)
+
+# grab dimensions from data
+n_dims = size(X_train, 2)
+
+##
+# Initialise n particles
+n_particles = 100
 
 # two dimensions, convention: 1st = n_particles, 2nd = theta dimensionality
-W = zeros(n_particles, n_dims-1)
+W = zeros(n_particles, n_dims)
 # Generates precision params (= alpha values) based on prior
-α = rand(Gamma(1,0.1), n_particles)
 
 # Generate coeffs based on precision params
 for i in 1:n_particles
      d = Normal(0, 1/α[i])
     # Alternatively, when storing log(alpha)
     # d = Normal(0, sqrt(1/α[i]))
-    W[i,:] =  rand(d, n_dims-1)
+    W[i,:] =  rand(d, n_dims)
 end
 
 # Concat regression coefficients and precision params
@@ -110,13 +135,14 @@ init_particles = hcat(W,α)
 # Alternatively, when storing log(alpha)
 # init_particles = hcat(W, broadcast(log, α))
 
-
 ##
-X = randn(n_samples, n_dims-1)
-Y = ones(n_samples, 1)
-
-
-
+@time sigmoids  = σ(W, X_train)
 ##
 
-ana_dlogblg(init_particles, X, Y)
+dlogblg(particles) = ana_dlogblg(particles, X_train, Y_train)
+##
+
+@time dlogp = dlogblg(init_particles)
+##
+# Particles return NaN values
+@time trans_parts = update(init_particles, dlogblg, n_epochs=200, dt=0.002, opt="adagrad")
