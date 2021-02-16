@@ -57,31 +57,29 @@ function ana_dlogblg(particles, X, Y, a0=1, b0=0.01)
       ∂(Σ_{1:j:K} ln p(w_k;0,α^-1) )/∂θ | (reformulating Normal, such that α is precision)
     =  ∂(Σ_{1:j:K} ln(sqrt(α)) - ln(sqrt(2π)) - 1/2*α*(w_k)^2 )/∂θ
 
-    => =  ∂(Σ_{1:j:K} ln(sqrt(α)) - ln(sqrt(2π)) - 1/2*α*(w_k)^2 )/∂α
-       =  Σ_{1:j:K} (-α*w_k)
-
     => =  ∂(Σ_{1:j:K} ln(sqrt(α)) - ln(sqrt(2π)) - 1/2*α*(w_k)^2 )/∂w_k
-       =  1/2α - 1/2(w_k)^2
-       =  1/2 * (α - (w_k)^2)
+       =  (-α*w_k)
+
+    => =  Σ_{1:j:K} ∂(ln(sqrt(α)) - ln(sqrt(2π)) - 1/2*α*(w_k)^2 )/∂α
+       =  Σ_{1:j:K} 1/2α - 1/2(w_k)^2
+       =  Σ_{1:j:K} 1/2 * (α - (w_k)^2)
     """
-
-    d_prec_dα = - α .* W
-    d_prec_dα = (sum(d_prec_dα, dims = 2)) # dim: particles x 1 (alpha)
-
-    d_prec_dW = 1/2 .* (α .- 1/2 .* W.^2) # dim: particles x length(W)
+    d_prec_dW = - α .* W # dim: particles x k
+    d_prec_dα = 1/2 .* (α .- W.^2) # dim: particles x k
+    d_prec_dα = dropdims(sum(prob, dims=2), dims=2) # dim: particles x 1 (alpha)
 
 
     """ Precision prior:
-      ∂(lnp(α;a0,b0))/∂α
+      ∂(lnp(α;a0,b0))/∂α | where p(α;a0,b0) ~ Gamma(α; a,b)
     = ∂(ln(b0^a0) - ln(Gamma-fct(a0)) + (a0-1)*ln(α) - b0*α)/∂α
-    = ∂( (a0-1)*ln(α) -b0*α)/∂α
+    = ∂( (a0-1)*ln(α) -b0*α )/∂α
     = ((a0-1)/α ) - b0
     """
-
     d_prec_prior_dα =  (a0 - 1) ./ α .-b0 # dim: particles x 1 (alpha)
 
-    d_joint_dw = d_DataLL_dW.+ d_prec_dW # dim: particles x k
-    d_joint_dα = d_prec_dα .+ d_prec_prior_dα # dim: particles x 1
+
+    d_joint_dw = d_DataLL_dW .+ d_prec_dW # dim: particles x k
+    d_joint_dα = d_prec_dα .+ d_prec_prior_dα # dim: particles x 1(alpha)
 
     return hcat(d_joint_dw,d_joint_dα)
 
@@ -96,6 +94,7 @@ function predict(particles, X_test)
     prob = zeros(n_particles, n_samples)
 
     for particle in 1:n_particles
+        squares = broadcast(*,transpose(coeffs[particle, :]),X_test)
         summed_squares = dropdims(sum(squares, dims = 2), dims= 2) # Σ_{1:j:K}
         prob[particle, :] = σ.(summed_squares)
 
@@ -192,3 +191,4 @@ avg_prob = dropdims(mean(prob, dims=1), dims=1)
 # evaluate
 prob_pred = evaluation(trans_parts, X_test, Y_test)
 prob_pred[prob_pred.<=0.5] .= 0
+##
