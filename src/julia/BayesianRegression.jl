@@ -87,9 +87,49 @@ function ana_dlogblg(particles, X, Y, a0=1, b0=0.01)
 
 end
 
+
+function predict(particles, X_test)
+
+    n_samples = size(X_test, 1)
+    coeffs = particles[:,1:end-1]
+    n_particles = size(coeffs, 1)
+    prob = zeros(n_particles, n_samples)
+
+    for particle in 1:n_particles
+        summed_squares = dropdims(sum(squares, dims = 2), dims= 2) # Σ_{1:j:K}
+        prob[particle, :] = σ.(summed_squares)
+
+    end
+
+    return prob
+
+end
+
+
+
+function evaluation(particles, X_test, Y_test)
+
+    n_samples = size(X_test, 1)
+    coeffs = particles[:,1:end-1]
+    n_particles = size(coeffs, 1)
+    prob = zeros(n_particles, n_samples)
+
+    for particle in 1:n_particles
+        squares = broadcast(*,transpose(coeffs[particle, :]),X_test)
+        summed_squares = dropdims(sum(squares, dims = 2), dims= 2) # Σ_{1:j:K}
+        z = summed_squares .* Y_test
+        prob[particle, :] = σ.(z)
+
+    end
+
+    return prob
+
+end
+
+
 ##
 data = matread("src/data/covertype.mat")["covtype"]
-n_samples = 15000
+n_samples = 5000
 
 # shuffleobs and splitobs utils need X to be transposed
 X = transpose(data[:,2:end])
@@ -121,7 +161,7 @@ n_particles = 100
 # two dimensions, convention: 1st = n_particles, 2nd = theta dimensionality
 W = zeros(n_particles, n_dims)
 # Generates precision params (= alpha values) based on prior
-
+α = rand(Gamma(1,0.1), n_particles)
 # Generate coeffs based on precision params
 for i in 1:n_particles
      d = Normal(0, 1/α[i])
@@ -138,11 +178,17 @@ init_particles = hcat(W,α)
 ##
 @time sigmoids  = σ(W, X_train)
 ##
-
 dlogblg(particles) = ana_dlogblg(particles, X_train, Y_train)
 ##
-
 @time dlogp = dlogblg(init_particles)
 ##
-# Particles return NaN values
-@time trans_parts = update(init_particles, dlogblg, n_epochs=200, dt=0.002, opt="adagrad")
+
+@time trans_parts = update(init_particles, dlogblg, n_epochs=500, dt=0.002, opt="adagrad")
+##
+prob = predict(trans_parts, X_test)
+# avg prob across particles
+avg_prob = dropdims(mean(prob, dims=1), dims=1)
+
+# evaluate
+prob_pred = evaluation(trans_parts, X_test, Y_test)
+prob_pred[prob_pred.<=0.5] .= 0
