@@ -27,20 +27,13 @@ include("SVGD.jl")
 
 σ(x:: Real) = 1.0 / (1.0 + exp(-x))
 
-function σ(W:: Array, X:: Array)
-    @einsum coeffs[particles, samples, dim] :=  W[particles, dim] * X[samples, dim]
-    z = dropdims(sum(coeffs, dims = 3), dims= 3) # weighted sum
-    sigmoids = σ.(z) # dim: particles x samples
-    return sigmoids
-end
-
 function ana_dlogblg(particles, X, Y, a0=1, b0=0.01)
     # number of regression coefficients
     k = size(particles,2) - 1
     # regression weights
     W = particles[:,1:k]
     # α stored in last dimension of particles
-    α = particles[:,k+1]
+    α = exp.(particles[:,k+1])
     # Alternatively, when storing log(alpha)
     # α = exp.(particles[:,k+1])
 
@@ -49,25 +42,27 @@ function ana_dlogblg(particles, X, Y, a0=1, b0=0.01)
     = [y_j - sigmoid(W^T* X)] * x_j
     """
 
-    sigmoids = σ(W, X) # dim: particles x samples
-    @einsum d_LL_dW[particles, params, samples] := (Y[samples] .- sigmoids[particles, samples]) * X[samples, params]
-    d_DataLL_dW = dropdims(sum(d_LL_dW, dims = 3), dims= 3) # dim: particles x k
+    sigmoids = σ.(W * X') # dim: particles x samples
+    d_DataLL_dW = (Y' .- sigmoids) * X
 
     """ Precision:
-      ∂(Σ_{1:j:K} ln p(w_k;0,α^-1) )/∂θ | (reformulating Normal, such that α is precision)
+    ! Normal formulation, using the precision param α = 1 / σ^2
+    ! See: https://en.wikipedia.org/wiki/Normal_distribution#Alternative_parameterizations
+
+      ∂(Σ_{1:j:K} ln p(w_k;0,α^-1) )/∂θ
     =  ∂(Σ_{1:j:K} ln(sqrt(α)) - ln(sqrt(2π)) - 1/2*α*(w_k)^2 )/∂θ
 
     => =  ∂(Σ_{1:j:K} ln(sqrt(α)) - ln(sqrt(2π)) - 1/2*α*(w_k)^2 )/∂w_k
        =  (-α*w_k)
 
-    => =  Σ_{1:j:K} ∂(ln(sqrt(α)) - ln(sqrt(2π)) - 1/2*α*(w_k)^2 )/∂α
+    => =  Σ_{1:j:K} ∂(ln(sqrt(α)) - ln(sqrt(2π)) - 1/2*α*w_k^2 )/∂α
        =  Σ_{1:j:K} 1/2α - 1/2(w_k)^2
        =  Σ_{1:j:K} 1/2 * (α - (w_k)^2)
     """
     d_prec_dW = - α .* W # dim: particles x k
-    d_prec_dα = 1/2 .* (α .- W.^2) # dim: particles x k
-    d_prec_dα = dropdims(sum(prob, dims=2), dims=2) # dim: particles x 1 (alpha)
 
+    d_prec_dα = 1/2 .* (α .- W.^2) # dim: particles x k
+    d_prec_dα = dropdims(sum(d_prec_dα , dims=2), dims=2) # dim: particles x 1 (alpha)
 
     """ Precision prior:
       ∂(lnp(α;a0,b0))/∂α | where p(α;a0,b0) ~ Gamma(α; a,b)
@@ -78,8 +73,8 @@ function ana_dlogblg(particles, X, Y, a0=1, b0=0.01)
     d_prec_prior_dα =  (a0 - 1) ./ α .-b0 # dim: particles x 1 (alpha)
 
 
-    d_joint_dw = d_DataLL_dW .+ d_prec_dW # dim: particles x k
-    d_joint_dα = d_prec_dα .+ d_prec_prior_dα # dim: particles x 1(alpha)
+    d_joint_dw = d_DataLL_dW + d_prec_dW # dim: particles x k
+    d_joint_dα = d_prec_dα + d_prec_prior_dα # dim: particles x 1(alpha)
 
     return hcat(d_joint_dw,d_joint_dα)
 
@@ -94,7 +89,7 @@ function predict(particles, X_test)
     prob = zeros(n_particles, n_samples)
 
     for particle in 1:n_particles
-        squares = broadcast(*,transpose(coeffs[particle, :]),X_test)
+        squares = broadcast(*,coeffs[particle, :],X_test)
         summed_squares = dropdims(sum(squares, dims = 2), dims= 2) # Σ_{1:j:K}
         prob[particle, :] = σ.(summed_squares)
 
@@ -105,7 +100,6 @@ function predict(particles, X_test)
 end
 
 
-
 function evaluation(particles, X_test, Y_test)
 
     n_samples = size(X_test, 1)
@@ -114,17 +108,17 @@ function evaluation(particles, X_test, Y_test)
     prob = zeros(n_particles, n_samples)
 
     for particle in 1:n_particles
-        squares = broadcast(*,transpose(coeffs[particle, :]),X_test)
+        squares = broadcast(*,coeffs[particle, :]',X_test)
         summed_squares = dropdims(sum(squares, dims = 2), dims= 2) # Σ_{1:j:K}
         z = summed_squares .* Y_test
         prob[particle, :] = σ.(z)
 
     end
-
     return prob
 
 end
 
+#ToDo: Check if the prediction and evaluation functions are correct!!!!!!!
 
 ##
 data = matread("src/data/covertype.mat")["covtype"]
@@ -160,29 +154,26 @@ n_particles = 100
 # two dimensions, convention: 1st = n_particles, 2nd = theta dimensionality
 W = zeros(n_particles, n_dims)
 # Generates precision params (= alpha values) based on prior
-α = rand(Gamma(1,0.1), n_particles)
+a = 1
+b = 0.01
+α = rand(Gamma(a, b), n_particles)
 # Generate coeffs based on precision params
 for i in 1:n_particles
-     d = Normal(0, 1/α[i])
+    # d = Normal(0, 1/α[i])
     # Alternatively, when storing log(alpha)
-    # d = Normal(0, sqrt(1/α[i]))
+    d = Normal(0, sqrt(1/α[i]))
     W[i,:] =  rand(d, n_dims)
 end
-
 # Concat regression coefficients and precision params
 init_particles = hcat(W,α)
 # Alternatively, when storing log(alpha)
 # init_particles = hcat(W, broadcast(log, α))
-
-##
-@time sigmoids  = σ(W, X_train)
 ##
 dlogblg(particles) = ana_dlogblg(particles, X_train, Y_train)
 ##
 @time dlogp = dlogblg(init_particles)
 ##
-
-@time trans_parts = update(init_particles, dlogblg, n_epochs=500, dt=0.002, opt="adagrad")
+@time trans_parts = update(init_particles, dlogblg, n_epochs=6000, dt=0.05, opt="adagrad")
 ##
 prob = predict(trans_parts, X_test)
 # avg prob across particles
@@ -190,5 +181,6 @@ avg_prob = dropdims(mean(prob, dims=1), dims=1)
 
 # evaluate
 prob_pred = evaluation(trans_parts, X_test, Y_test)
-prob_pred[prob_pred.<=0.5] .= 0
+acc = mean(prob_pred[prob_pred.>=0.5])
 ##
+plot(avg_prob)
