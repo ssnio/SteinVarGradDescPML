@@ -1,8 +1,4 @@
-using Einsum
 using Distributions: Gamma, Normal
-using MAT
-using MLDataUtils: shuffleobs, splitobs
-include("SVGD.jl")
 
 """
     Analytical gradient of log joint for bayesian logistic regression.
@@ -32,10 +28,9 @@ function ana_dlogblg(particles, X, Y, a0=1, b0=0.01)
     k = size(particles,2) - 1
     # regression weights
     W = particles[:,1:k]
-    # α stored in last dimension of particles
-    α = exp.(particles[:,k+1])
-    # Alternatively, when storing log(alpha)
-    # α = exp.(particles[:,k+1])
+    # log(α) stored in last dimension of particles
+    α = exp.(particles[:,end])
+    # α = particles[:,end]
 
     """ Log-Likelihood:
     ∂LL / ∂W_j = ∂LL(θ) / ∂p * ∂p / ∂z * ∂z / ∂W_j
@@ -43,6 +38,7 @@ function ana_dlogblg(particles, X, Y, a0=1, b0=0.01)
     """
 
     sigmoids = σ.(W * X') # dim: particles x samples
+    Y = (Y .+ 1) ./ 2 # rescaling Y
     d_DataLL_dW = (Y' .- sigmoids) * X
 
     """ Precision:
@@ -56,25 +52,32 @@ function ana_dlogblg(particles, X, Y, a0=1, b0=0.01)
        =  (-α*w_k)
 
     => =  Σ_{1:j:K} ∂(ln(sqrt(α)) - ln(sqrt(2π)) - 1/2*α*w_k^2 )/∂α
-       =  Σ_{1:j:K} 1/2α - 1/2(w_k)^2
-       =  Σ_{1:j:K} 1/2 * (α - (w_k)^2)
+       =  Σ_{1:j:K} 1/2α - 1/2(w_k)^2          | * α
+       =  Σ_{1:j:K} 1/2 - (α/2(w_k)^2
+       = k/2 - Σ_{1:j:K} α/2 * (w_k)^2
+
     """
+
     d_prec_dW = - α .* W # dim: particles x k
 
-    d_prec_dα = 1/2 .* (α .- W.^2) # dim: particles x k
+    d_prec_dα = 1/2 .- (α ./ 2 .* W.^2) # dim: particles x k
     d_prec_dα = dropdims(sum(d_prec_dα , dims=2), dims=2) # dim: particles x 1 (alpha)
 
     """ Precision prior:
       ∂(lnp(α;a0,b0))/∂α | where p(α;a0,b0) ~ Gamma(α; a,b)
     = ∂(ln(b0^a0) - ln(Gamma-fct(a0)) + (a0-1)*ln(α) - b0*α)/∂α
     = ∂( (a0-1)*ln(α) -b0*α )/∂α
-    = ((a0-1)/α ) - b0
+    = ((a0-1)/α ) - b0  | * α
+    = (a0-1) - b0 * α
     """
-    d_prec_prior_dα =  (a0 - 1) ./ α .-b0 # dim: particles x 1 (alpha)
 
+    # last term is jacobian term
+    d_prec_prior_dα =  (a0 - 1) .- b0 .* α .+ 1 # dim: particles x 1 (alpha)
 
     d_joint_dw = d_DataLL_dW + d_prec_dW # dim: particles x k
     d_joint_dα = d_prec_dα + d_prec_prior_dα # dim: particles x 1(alpha)
+
+    d_joint_dα = d_prec_dα + d_prec_prior_dα
 
     return hcat(d_joint_dw,d_joint_dα)
 
@@ -89,7 +92,7 @@ function predict(particles, X_test)
     prob = zeros(n_particles, n_samples)
 
     for particle in 1:n_particles
-        squares = broadcast(*,coeffs[particle, :],X_test)
+        squares = broadcast(*,coeffs[particle, :]',X_test)
         summed_squares = dropdims(sum(squares, dims = 2), dims= 2) # Σ_{1:j:K}
         prob[particle, :] = σ.(summed_squares)
 
@@ -100,87 +103,27 @@ function predict(particles, X_test)
 end
 
 
-function evaluation(particles, X_test, Y_test)
+function gen_blg_particles(n_dims, n_particles = 100, a = 1, b=0.01)
+    # Initialise n particles
 
-    n_samples = size(X_test, 1)
-    coeffs = particles[:,1:end-1]
-    n_particles = size(coeffs, 1)
-    prob = zeros(n_particles, n_samples)
-
-    for particle in 1:n_particles
-        squares = broadcast(*,coeffs[particle, :]',X_test)
-        summed_squares = dropdims(sum(squares, dims = 2), dims= 2) # Σ_{1:j:K}
-        z = summed_squares .* Y_test
-        prob[particle, :] = σ.(z)
-
+    # two dimensions, convention: 1st = n_particles, 2nd = theta dimensionality
+    W = zeros(n_particles, n_dims)
+    # Generates precision params (= alpha values) based on prior
+    a = 1
+    b = 0.01
+    α = rand(Gamma(a, b), n_particles)
+    # Generate coeffs based on precision params
+    for i in 1:n_particles
+        # Precision α is the reciprocal of the variance σ
+        d = Normal(0, sqrt(1/α[i]))
+        W[i,:] =  rand(d, n_dims)
     end
-    return prob
+    # Concat regression coefficients and precision params
+    # Storing log(α) to use smoothness of log when doing transformations
+    # init_parts = hcat(W,α)
+    # Alternative: Store log(alpha), such that optimization takes space in log(α) space.
+    init_particles = hcat(W, broadcast(log, α))
+
+    return init_particles
 
 end
-
-#ToDo: Check if the prediction and evaluation functions are correct!!!!!!!
-
-##
-data = matread("src/data/covertype.mat")["covtype"]
-n_samples = 5000
-
-# shuffleobs and splitobs utils need X to be transposed
-X = transpose(data[:,2:end])
-# replace label 2 with label -1
-Y = data[:,1]
-Y[Y.==2] .= -1
-
-# shuffle
-Xs, Ys = shuffleobs((X,Y))
-#take first n_samples
-Xs = Xs[:, 1:n_samples]
-Ys = Ys[1:n_samples]
-# split
-(X_train, Y_train), (X_test, Y_test) = splitobs((Xs, Ys), at= 0.7)
-
-# transpose back
-X_train = Array(transpose(X_train))
-Y_train = Array(Y_train)
-X_test = Array(transpose(X_test))
-Y_test = Array(Y_test)
-
-# grab dimensions from data
-n_dims = size(X_train, 2)
-
-##
-# Initialise n particles
-n_particles = 100
-
-# two dimensions, convention: 1st = n_particles, 2nd = theta dimensionality
-W = zeros(n_particles, n_dims)
-# Generates precision params (= alpha values) based on prior
-a = 1
-b = 0.01
-α = rand(Gamma(a, b), n_particles)
-# Generate coeffs based on precision params
-for i in 1:n_particles
-    # d = Normal(0, 1/α[i])
-    # Alternatively, when storing log(alpha)
-    d = Normal(0, sqrt(1/α[i]))
-    W[i,:] =  rand(d, n_dims)
-end
-# Concat regression coefficients and precision params
-init_particles = hcat(W,α)
-# Alternatively, when storing log(alpha)
-# init_particles = hcat(W, broadcast(log, α))
-##
-dlogblg(particles) = ana_dlogblg(particles, X_train, Y_train)
-##
-@time dlogp = dlogblg(init_particles)
-##
-@time trans_parts = update(init_particles, dlogblg, n_epochs=6000, dt=0.05, opt="adagrad")
-##
-prob = predict(trans_parts, X_test)
-# avg prob across particles
-avg_prob = dropdims(mean(prob, dims=1), dims=1)
-
-# evaluate
-prob_pred = evaluation(trans_parts, X_test, Y_test)
-acc = mean(prob_pred[prob_pred.>=0.5])
-##
-plot(avg_prob)

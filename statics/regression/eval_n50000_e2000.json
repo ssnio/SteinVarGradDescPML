@@ -1,0 +1,10 @@
+{
+    "precision@fpr0.05": 0.8867750843817122,
+    "recall@fpr0.05": 0.37926509186351703,
+    "accuracy@fpr0.05": 0.6600666666666667,
+    "au_prcurve": 0.8309959879112625,
+    "samples": 15000,
+    "true negative rate@fpr0.05": 0.95,
+    "au_roccurve": 0.8255699236782343,
+    "prevalence": 0.508
+}
