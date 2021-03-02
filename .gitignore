@@ -19,4 +19,4 @@ Manifest.toml
 
 # macOS specific
 .DS_Store
-*/.DS_Store	
+*/.DS_Store
