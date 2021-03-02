@@ -4,8 +4,8 @@ using EvalMetrics
 using Plots
 using JSON
 plotly()
-include("SVGD.jl")
-include("BayesianRegression.jl")
+include("../SVGD.jl")
+include("SVGD_BayesianRegression.jl")
 
 ## UCI/Covertype data set. Source: https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/binary.html
 data = matread("src/data/covertype.mat")["covtype"]

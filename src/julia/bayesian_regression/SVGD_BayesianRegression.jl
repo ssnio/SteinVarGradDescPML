@@ -1,6 +1,6 @@
 using Distributions: Gamma, Normal
 
-"""
+"""     
     Analytical gradient of log joint for bayesian logistic regression.
 
     The observed data D = {X, y} consist of N binary class labels y_t in {-1,1},
@@ -16,7 +16,7 @@ using Distributions: Gamma, Normal
     p(w_k | α) ~ N(w_k; 0, α^-1)
     p(α; a,b) ~ Gamma(α; a,b)
 
-    Logistic regression documentation:
+    About logistic regression:
     https://web.stanford.edu/class/archive/cs/cs109/cs109.1178/lectureHandouts/220-logistic-regression.pdf
 
 """
