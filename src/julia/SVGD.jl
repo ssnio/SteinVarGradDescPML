@@ -23,9 +23,6 @@ end
 
 
 """
-<<<<<<< Updated upstream
-    Analytical gradient of log of Multivariae normal distribution
-=======
     very lazy implementation of Mesh-Grid for 2D-distributions
 """
 function pdf_grid(x_, y_, dist_2D)
@@ -41,7 +38,6 @@ end
 
 """
     Analytical gradient of log of Multivariate normal distribution
->>>>>>> Stashed changes
 """
 function ana_dlogmvn(μ, Σ, x)
     - broadcast(-, x, μ) * Σ^-1
