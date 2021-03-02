@@ -8,7 +8,7 @@ __pycache__
 */__pycache__/*
 
 # Notebooks
-ipynb_checkpoints
+.ipynb_checkpoints
 */.ipynb_checkpoints/*
 
 # Manifest
@@ -19,3 +19,4 @@ Manifest.toml
 
 # macOS specific
 .DS_Store
+*/.DS_Store	
