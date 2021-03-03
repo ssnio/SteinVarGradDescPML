@@ -49,6 +49,7 @@ Please install them to rerun our experiments.
 * Francesco D'Angelo and Vincent Fortuin [*Annealed Stein Variational Gradient Descent*](https://openreview.net/pdf?id=pw2v8HFJIYg), 3rd Symposium on Advances in Approximate Bayesian Inference, 2020
 * Gianluca Detommaso et al. [*A Stein variational Newton method*](https://arxiv.org/pdf/1806.03085.pdf), arxiv.org, 2018
 * José Miguel Hernández-Lobato et al. [*Probabalistic Backpropagation for Scalable Learning of Bayesian Neural Networks*](https://jmhldotorg.files.wordpress.com/2015/05/pbp-icml2015.pdf), ICML, 2015
+* Qiang Liu et al. [*A Kernelized Stein Discrepancy for Goodness-of-Fit Tests](https://arxiv.org/pdf/1602.03253.pdf), arxiv.org, 2016
 * Qiang Liu [*Stein Variational Gradient Descent as Gradient Flow*](https://arxiv.org/pdf/1704.07520.pdf), arxiv.org, 2017
 * Samuel J. Gershman et al. [*Nonparametric Variational Inference*](https://icml.cc/2012/papers/360.pdf), ICML, 2012
 * Yang Liu et al. [*Stein Variational Policy Gradient*](https://arxiv.org/pdf/1704.02399.pdf), arxiv.org, 2017
