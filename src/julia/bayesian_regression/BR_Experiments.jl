@@ -69,10 +69,8 @@ Y_test[Y_test.==-1] .= 0
 ##
 using JLD
 # save("statics/regression/particles_regression_n=100000_e=5000.jld","particles", hist_parts)
- d = load("statics/regression/particles_regression_n=100000_e=5000.jld")
+ d = load("statics/bayesian_regression/particles_regression_n=100000_e=5000.jld")
 hist_parts = d["particles"]
-
-
 ##
 acc_over_time = zeros(size(hist_parts,1))
 n = size(Y_test,1)

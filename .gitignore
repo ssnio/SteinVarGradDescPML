@@ -20,3 +20,4 @@ Manifest.toml
 # macOS specific
 .DS_Store
 */.DS_Store
+statics/bayesian_regression/particles_regression_n=100000_e=5000.jld
