@@ -2,6 +2,7 @@
 # imports
 using Statistics: mean, median
 using Distances: pairwise, Euclidean
+using Random: randperm
 
 
 """
@@ -98,7 +99,7 @@ function update(X, dlogpdf; n_epochs=20000, dt=0.01, α=0.9, opt="adagrad")
             end
             ϕ ./= ϵ .+ sqrt.(ϕ_t)
         end
-        X = X + dt .* ϕ
+        X += dt .* ϕ
     end
     return X
 end
@@ -116,10 +117,10 @@ function update_rec(X, dlogpdf; n_epochs=20000, dt=0.01, α=0.9, opt="none")
     for i in 1:n_epochs
 
         # evaluating the derivative of log pdf on particles
-        dlogpdf_val = dlogpdf(X)
+        dlogpdf_val = dlogpdf(X_records[i, :, :])
 
         # calculating the kernel matrix
-        kxy, dxkxy = sq_exp_kernel(X)
+        kxy, dxkxy = sq_exp_kernel(X_records[i, :, :])
 
         # gradient (step direction)
         ϕ = ((kxy * dlogpdf_val) .+ dxkxy) ./ n_parts
@@ -133,10 +134,9 @@ function update_rec(X, dlogpdf; n_epochs=20000, dt=0.01, α=0.9, opt="none")
             end
             ϕ ./= ϵ .+ sqrt.(ϕ_t)
         end
-        X = X + dt .* ϕ
-        X_records[i+1, :, :] = X
+        X_records[i+1, :, :] = X_records[i, :, :] + dt .* ϕ
     end
-    return X, X_records
+    return X_records[n_epochs+1, :, :], X_records
 end
 
 
@@ -192,7 +192,7 @@ Ref: F. D’Angelo, V. Fortuin, *Annealed Stein Variational Gradient Descent*, 2
 - `annealing::Float64`: the ratio of epochs where annealing is scheduled (default is 0.8)
 """
 function annealing_schedule(n_epochs::Int, method::String; annealing::Float64=0.8)
-    C = 4
+    C = 3
     T = int(n_epochs*annealing)
     t = range(0., 1., length=T)
     γ_t = ones(n_epochs)
