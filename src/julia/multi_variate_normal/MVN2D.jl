@@ -8,12 +8,13 @@ begin
 	using ForwardDiff
 end
 
-loc_dir = "../SteinVarGradDescPML/statics";
+loc_dir = "../SteinVarGradDescPML/statics"
 
 begin # # parameters
 	n_epochs=120^2
 	n_frames = (1:120) .^ 2
 	n_parts = 120
+	gr(size=(640,640))
 end
 
 begin
@@ -45,7 +46,6 @@ begin
 end
 
 begin # # plot PDF heatmap
-	gr(size=(640,640))
 	contourf(xx, yy, mvn_grid, xlims=(-3, 3), ylims=(-3, 3), aspect_ratio=1, legend=false, border=:none, background_color=:transparent, axis=nothing, c=:PuBu_8)
 	scatter!(init_particles[:, 2], init_particles[:, 1], color="red", markerstrokecolor=:red, ms=4)
 	savefig(joinpath(loc_dir, "MVN2D_init.png"))
@@ -57,7 +57,6 @@ begin
 end
 
 begin # # plot PDF heatmap
-	gr(size=(640,640))
 	contourf(xx, yy, mvn_grid, xlims=(-3, 3), ylims=(-3, 3), aspect_ratio=1, legend=false, border=:none, background_color=:transparent, axis=nothing, c=:PuBu_8)
 	scatter!(trans_parts[:, 2], trans_parts[:, 1], color="red", markerstrokecolor=:red, ms=4)
 	savefig(joinpath(loc_dir, "MVN2D_evolved.png"))
