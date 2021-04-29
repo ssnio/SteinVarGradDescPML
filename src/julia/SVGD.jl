@@ -54,7 +54,8 @@ function sq_exp_kernel(X)
     n_parts, n_dims = size(X)
 
     sq_pairwise_dists = pairwise(Euclidean(), X', X', dims=2).^2
-    #@assert size(sq_pairwise_dists) == (num_particles, num_particles)
+
+    # @assert size(sq_pairwise_dists) == (num_particles, num_particles)
     # l: length scale
     l = sqrt(median(sq_pairwise_dists) / 2 / log(n_parts + 1))
     kxy = exp.(-sq_pairwise_dists / l.^2 / 2)
@@ -81,15 +82,14 @@ function update(X, dlogpdf; n_epochs=20000, dt=0.01, α=0.9, opt="adagrad")
 
     for i in 1:n_epochs
 
-        # evaluating the derivative of log pdf on particles
+        # evaluating the gradient of log pdf on particles
         dlogpdf_val = dlogpdf(X)
 
-        # calculating the kernel matrix
+        # calculating the kernel matrix and its gradient
         kxy, dxkxy = sq_exp_kernel(X)
 
-        # gradient (step direction)
+        # gradient (steepest descent direction)
         ϕ = ((kxy * dlogpdf_val) .+ dxkxy) ./ n_parts
-
 
         if opt == "adagrad" # as implemented in SVGD original repo
             if i == 0
@@ -116,15 +116,14 @@ function update_rec(X, dlogpdf; n_epochs=20000, dt=0.01, α=0.9, opt="none")
 
     for i in 1:n_epochs
 
-        # evaluating the derivative of log pdf on particles
+        # evaluating the gradient of log pdf on particles
         dlogpdf_val = dlogpdf(X_records[i, :, :])
 
-        # calculating the kernel matrix
+        # calculating the kernel matrix and its gradient
         kxy, dxkxy = sq_exp_kernel(X_records[i, :, :])
 
-        # gradient (step direction)
+        # gradient (steepest descent direction)
         ϕ = ((kxy * dlogpdf_val) .+ dxkxy) ./ n_parts
-
 
         if opt == "adagrad" # as implemented in SVGD original repo
             if i == 0
