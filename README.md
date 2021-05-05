@@ -40,7 +40,7 @@ Please install them to rerun our experiments.
 ---
 ## References
 
-### Main Paper
+### Main references
 * Qiang Liu and Dilin Wang [*Stein Variational Gradient Descent: A General Purpose Bayesian Inference Algorithm (Paper)*](https://arxiv.org/pdf/1608.04471.pdf), NIPS, 2016
 * dilinwang820/Stein-Variational-Gradient-Descent [*Stein Variational Gradient Descent (SVGD) (Code Repository)*](https://github.com/dilinwang820/Stein-Variational-Gradient-Descent), github.com, 2016
 
