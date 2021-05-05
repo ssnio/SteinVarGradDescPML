@@ -8,11 +8,56 @@ The method we analysed was Stein Variational Gradient Descent, a non-parametric 
 We reimplemented the codebase and rerun the experiments the authors have documented in their original repository and further performed additional experiments that showcase characteristics and limitations of the SVGD.
 
 ---
+## Demo
 
+### Pseudo-Julia implementation
+
+```julia
+using Distributions
+using ForwardDiff
+using KernelFunctions
+
+function SVGD(x, scorefun, kernel, grad_kernel, n_epochs, ϵ)
+    n_particles = size(x, 1) # number of particles
+    for i in 1:n_epochs
+        scorefun_X = scorefun(x) # ∇ log p(x)
+        kxy = kernel(x) # k(⋅, x)
+		dxkxy = grad_kernel(x) # ∇k(⋅, x)
+        ϕ = ((kxy * dlogpdf_val) .+ dxkxy) ./ n_particles # steepest descent
+        x += dt .* ϕ # updating the particles
+    end
+    return x
+end
+```
+
+### SVGD for Neal's Funnel
+
+<p align=center>
+<img src="https://raw.githubusercontent.com/ssnio/statics/main/pml/nealsfunnel/NealsFunnel_evolution_big_vanilla.gif" alt="More Particles"  width=480/>
+</p>
+
+---
 ## Installation
 
-We used different languages (Python 3.6; Julia 1.5) and libraries (e.g. pytorch, numpy) throughout our experiments.
-Please install them to rerun our experiments.
+We used different languages (Python 3.6; Julia 1.5) and following libraries throughout our experiments. Please install them to rerun our experiments:  
+Python:
+- PyTorch
+- Numpy
+- Scikit-Learn
+- Matplotlib
+- Scipy
+
+Julia:
+- Statistics
+- Distances
+- Random
+- ForwardDiff
+- LinearAlgebra
+- Distributions
+- Plots
+- KernelFunctions
+- EvalMetrics
+- MLDataUtils
 
 ---
 ## Code structure
@@ -55,3 +100,4 @@ Please install them to rerun our experiments.
 * Qiang Liu [*Stein Variational Gradient Descent as Gradient Flow*](https://arxiv.org/pdf/1704.07520.pdf), arxiv.org, 2017
 * Samuel J. Gershman et al. [*Nonparametric Variational Inference*](https://icml.cc/2012/papers/360.pdf), ICML, 2012
 * Yang Liu et al. [*Stein Variational Policy Gradient*](https://arxiv.org/pdf/1704.02399.pdf), arxiv.org, 2017
+* Radford M. Neal, [*Slice Sampling*](https://www.jstor.org/stable/3448413), Annals of Statistics 31 (3): 705-67, 2003
