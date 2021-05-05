@@ -24,7 +24,7 @@ function SVGD(x, scorefun, kernel, grad_kernel, n_epochs, ϵ)
         kxy = kernel(x) # k(⋅, x)
 		dxkxy = grad_kernel(x) # ∇k(⋅, x)
         ϕ = ((kxy * dlogpdf_val) .+ dxkxy) ./ n_particles # steepest descent
-        x += dt .* ϕ # updating the particles
+        x += ϵ .* ϕ # updating the particles
     end
     return x
 end
