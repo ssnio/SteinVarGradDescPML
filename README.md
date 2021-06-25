@@ -33,7 +33,7 @@ end
 ### SVGD for Neal's Funnel
 
 <p align=center>
-<img src="https://raw.githubusercontent.com/ssnio/ReachingRNN/main/static/setup.png" alt="Setup"/>
+<img src="https://raw.githubusercontent.com/ssnio/SteinVarGradDescPML/main/statics/NealsFunnel/SVGD_NealsFunnel.gif" alt="More Particles"  width=480/>
 </p>
 
 ---
